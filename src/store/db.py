@@ -1,5 +1,6 @@
 import hashlib
 import json
+import os
 import sqlite3
 from datetime import date, timedelta
 from pathlib import Path
@@ -7,7 +8,10 @@ from typing import Optional
 
 import pandas as pd
 
-DB_PATH = Path(__file__).parent.parent.parent / "data" / "nrc.db"
+if os.environ.get("VERCEL"):
+    DB_PATH = Path("/tmp") / "nrc.db"
+else:
+    DB_PATH = Path(__file__).parent.parent.parent / "data" / "nrc.db"
 
 _SCHEMA = """
 PRAGMA journal_mode=WAL;
