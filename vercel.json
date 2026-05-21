@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "web/app.py": {
+      "maxDuration": 60
+    }
+  }
+}

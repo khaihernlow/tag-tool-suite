@@ -248,7 +248,20 @@ async def start_analysis(request: Request):
         daemon=True,
     )
     thread.start()
+
+    if os.environ.get("VERCEL"):
+        import asyncio
+        while thread.is_alive():
+            await asyncio.sleep(0.5)
+        return JSONResponse({
+            "status": _job["status"],
+            "log": _job["log"],
+            "recommendations": _job["recommendations"],
+            "error": _job["error"],
+        })
+
     return JSONResponse({"status": "started"})
+
 
 
 @app.get("/analyze/status")

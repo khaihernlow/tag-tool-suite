@@ -795,13 +795,41 @@
     logOffsetPointer = 0;
 
     try {
+      startPolling();
       const resp = await fetch('/analyze/start', { method: 'POST', body: formData });
       if (!resp.ok) {
         const err = await resp.json();
         showErrorState(err.error || 'Could not start analysis pipeline.');
         return;
       }
-      startPolling();
+      
+      const data = await resp.json();
+      if (data.status === 'done') {
+        clearInterval(activePollTimer);
+        allRecommendations = data.recommendations;
+        
+        if (data.log) {
+          elConsole.innerHTML = '';
+          data.log.forEach(line => {
+            const div = document.createElement('div');
+            div.className = 'console-line';
+            div.textContent = line;
+            elConsole.appendChild(div);
+          });
+          elConsole.scrollTop = elConsole.scrollHeight;
+        }
+
+        // Soft reload to refresh cache count
+        fetch('/analyze/status').then(r => r.json()).then(d => {
+          location.reload();
+        }).catch(() => {});
+        
+        showResultsState();
+        filterAndRender();
+      } else if (data.status === 'error') {
+        clearInterval(activePollTimer);
+        showErrorState(data.error || 'Job failed in analysis runtime.');
+      }
     } catch (err) {
       showErrorState('Network connection failure initiating analysis.');
     }
