@@ -109,14 +109,13 @@ Sub-issue breakdown: {json.dumps(pattern.sub_issue_breakdown)}{contact_line}{age
 Representative sample ({len(sample)} of {pattern.ticket_count} tickets):
 {tickets_block}
 
-Respond with ONLY a JSON object in this exact schema (no markdown, no explanation):
+Respond with ONLY a JSON object in this exact schema (no code block tags, no explanation):
 {{
-  "pattern_summary": "<1-2 sentence description of the recurring pattern>",
-  "root_cause": "<what is actually driving these tickets>",
+  "pattern_summary": "<bullet points (use markdown '-' or '*') describing the recurring pattern>",
+  "root_cause": "<bullet points explaining what is actually driving these tickets>",
   "recommendation_type": "<one of: automation | training | process_change | sales_opportunity>",
-  "recommended_action": "<specific, actionable step TAG Solutions should take>",
-  "estimated_monthly_tickets_prevented": <integer>,
-  "priority": "<one of: high | medium | low>"
+  "recommended_action": "<bullet points detailing specific, actionable steps TAG Solutions should take>",
+  "estimated_monthly_tickets_prevented": <integer>
 }}
 """
 
@@ -135,7 +134,6 @@ def _result_to_recommendation(result: dict, pattern: Pattern) -> Recommendation:
         estimated_monthly_tickets_prevented=int(
             result.get("estimated_monthly_tickets_prevented", 0)
         ),
-        priority=result.get("priority", "medium"),
         source_ticket_numbers=_ticket_numbers(pattern),
     )
 
@@ -144,7 +142,8 @@ def generate_recommendations(
     patterns: List[Pattern],
     client: HatzAIClient,
     conn: Optional[sqlite3.Connection] = None,
-    since_date: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     force_refresh: bool = False,
     max_patterns: int = 20,
 ) -> List[Recommendation]:
@@ -156,7 +155,7 @@ def generate_recommendations(
       3. Fetch historical context for patterns that need LLM calls
       4. Run LLM calls concurrently (ThreadPoolExecutor)
       5. Write new results to cache (sequential — safe DB writes)
-      6. Sort by priority then estimated impact
+      6. Sort by estimated impact
     """
     candidates = [p for p in patterns[:max_patterns] if p.ticket_count >= MIN_LLM_TICKETS]
     filtered_out = len(patterns[:max_patterns]) - len(candidates)
@@ -187,12 +186,12 @@ def generate_recommendations(
 
     # ── phase 2: historical context for LLM patterns ──────────────────────────
     hist_contexts: dict[str, dict] = {}
-    if conn and since_date and needs_llm:
+    if conn and start_date and end_date and needs_llm:
         for pattern in needs_llm:
             key = f"{pattern.account}||{pattern.issue_type}"
             if key not in hist_contexts:
                 hist_contexts[key] = get_historical_context(
-                    pattern.account, pattern.issue_type, since_date, conn
+                    pattern.account, pattern.issue_type, start_date, end_date, conn
                 )
 
     # ── phase 3: concurrent LLM calls ─────────────────────────────────────────
@@ -236,10 +235,5 @@ def generate_recommendations(
         print(f"\n  Cache: {cache_hits} hits, {len(llm_results)} LLM calls made.")
 
     all_recs = cached_recs + new_recs
-    all_recs.sort(
-        key=lambda r: (
-            {"high": 0, "medium": 1, "low": 2}.get(r.priority, 1),
-            -r.estimated_monthly_tickets_prevented,
-        )
-    )
+    all_recs.sort(key=lambda r: -r.estimated_monthly_tickets_prevented)
     return all_recs

@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Noise Reduction Committee (NRC) AI Dashboard by TAG Solutions. Extract patterns and analyze ticket relationships with HatzAI.">
+  <title>{% block title %}NRC AI{% endblock %} — TAG Solutions</title>
+  <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.2/src/regular/style.css" />
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@100..900&display=swap');
+
+    :root {
+      --font-body: 'Google Sans Flex', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-title: 'Google Sans Flex', sans-serif;
+
+      /* Premium Light Mode Theme */
+      --bg-primary: #f8fafc;
+      --bg-secondary: #ffffff;
+      --bg-card: rgba(255, 255, 255, 0.85);
+      --bg-card-solid: #ffffff;
+      --border-color: rgba(226, 232, 240, 0.8);
+      
+      --text-primary: #0f172a;
+      --text-secondary: #475569;
+      --text-muted: #94a3b8;
+
+      --accent-color: #1A6BB5;
+      --accent-hover: #145692;
+      --accent-glow: rgba(26, 107, 181, 0.15);
+
+      --color-success: #10b981;
+      --color-warning: #f59e0b;
+      --color-danger: #ef4444;
+
+      --border-radius-sm: 6px;
+      --border-radius-md: 12px;
+      --border-radius-lg: 16px;
+      
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.05), 0 2px 4px -1px rgba(15, 23, 42, 0.03);
+      --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.06), 0 4px 6px -2px rgba(15, 23, 42, 0.02);
+      --transition-fast: 0.2s ease;
+      --transition-normal: 0.3s ease;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    input, button, select, textarea {
+      font-family: inherit;
+    }
+
+    body {
+      font-family: var(--font-body);
+      font-size: 14px;
+      color: var(--text-primary);
+      background-color: var(--bg-primary);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(26, 107, 181, 0.03) 0px, transparent 50%),
+        radial-gradient(at 50% 0%, rgba(16, 185, 129, 0.01) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(26, 107, 181, 0.03) 0px, transparent 50%);
+      background-attachment: fixed;
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+
+    /* ── nav ── */
+    nav {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 0 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 64px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    nav .brand-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    nav .logo-icon {
+      background: linear-gradient(135deg, var(--accent-color), #4094e0);
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      color: #fff;
+      font-family: var(--font-title);
+      font-size: 14px;
+      box-shadow: 0 4px 12px var(--accent-glow);
+    }
+
+    nav .brand {
+      font-family: var(--font-title);
+      font-weight: 500;
+      font-size: 18px;
+      letter-spacing: -0.02em;
+      background: linear-gradient(to right, #0f172a, #475569);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    nav .meta-tag {
+      background: rgba(0, 0, 0, 0.04);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 11px;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    /* ── layout ── */
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 32px;
+    }
+
+    h1, h2, h3, h4 {
+      font-family: var(--font-title);
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    h1 {
+      font-size: 28px;
+      margin-bottom: 24px;
+      background: linear-gradient(to right, #0f172a, var(--accent-color));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    h2 {
+      font-size: 18px;
+      margin-bottom: 16px;
+      color: var(--text-primary);
+    }
+
+    /* ── cards ── */
+    .card {
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius-lg);
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow-md);
+      transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+    }
+
+
+    /* ── buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border-radius: var(--border-radius-md);
+      font-family: var(--font-body);
+      font-size: 13.5px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all var(--transition-fast);
+      border: 1px solid transparent;
+      outline: none;
+    }
+
+    .btn-primary {
+      background: var(--accent-color);
+      color: #fff;
+      box-shadow: 0 4px 12px var(--accent-glow);
+    }
+
+
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: var(--color-danger);
+    }
+
+
+    .btn-secondary {
+      background: #f1f5f9;
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+    }
+
+
+    /* ── spinner ── */
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-top-color: currentColor;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* ── priority badges ── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .badge-high {
+      background: rgba(239, 68, 68, 0.1);
+      color: #dc2626;
+      border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+
+    .badge-medium {
+      background: rgba(217, 119, 6, 0.1);
+      color: #d97706;
+      border: 1px solid rgba(217, 119, 6, 0.2);
+    }
+
+    .badge-low {
+      background: rgba(16, 185, 129, 0.1);
+      color: #059669;
+      border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+
+    .muted {
+      color: var(--text-secondary);
+    }
+
+    .mt16 { margin-top: 16px; }
+    .hidden { display: none; }
+  </style>
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+<nav>
+  <div class="brand-container">
+    <div class="logo-icon">N</div>
+    <span class="brand">Noise Reduction Committee</span>
+  </div>
+  <img src="/logo.png" alt="TAG Solutions Logo" style="height: 40px; width: auto; display: block;" />
+</nav>
+
+<div class="container">
+  {% block content %}{% endblock %}
+</div>
+
+</body>
+</html>

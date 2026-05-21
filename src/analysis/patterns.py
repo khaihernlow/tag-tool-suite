@@ -5,6 +5,9 @@ from ..models.ticket import Pattern
 MIN_CLUSTER_SIZE = 2
 
 
+DEDUP_OVERLAP_THRESHOLD = 0.6  # skip a pattern if >60% of its tickets already appear in an accepted pattern
+
+
 def find_patterns(df: pd.DataFrame) -> List[Pattern]:
     # pre-compute per-account totals once so every detector can compute noise ratio
     account_totals = df.groupby("account").size().to_dict()
@@ -15,7 +18,27 @@ def find_patterns(df: pd.DataFrame) -> List[Pattern]:
     patterns.extend(_same_day_burst_patterns(df, account_totals))
 
     patterns.sort(key=lambda p: (p.ticket_count, p.unique_contacts), reverse=True)
-    return patterns
+    return _deduplicate(patterns)
+
+
+def _deduplicate(patterns: List[Pattern]) -> List[Pattern]:
+    """Remove patterns whose ticket set substantially overlaps with an already-accepted pattern."""
+    accepted: List[Pattern] = []
+    accepted_tickets: List[set] = []
+
+    for pattern in patterns:
+        tickets = {t["ticket_number"] for t in pattern.tickets}
+        duplicate = False
+        for seen in accepted_tickets:
+            overlap = len(tickets & seen) / len(tickets)
+            if overlap >= DEDUP_OVERLAP_THRESHOLD:
+                duplicate = True
+                break
+        if not duplicate:
+            accepted.append(pattern)
+            accepted_tickets.append(tickets)
+
+    return accepted
 
 
 def _to_records(group: pd.DataFrame) -> list:

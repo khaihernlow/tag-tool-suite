@@ -88,16 +88,25 @@ def import_tickets(df: pd.DataFrame, conn: sqlite3.Connection) -> tuple[int, int
 
 def load_tickets(
     conn: sqlite3.Connection,
-    since_date: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
 ) -> pd.DataFrame:
-    """Load tickets from the store, optionally filtered to on/after since_date (ISO format)."""
-    if since_date:
-        rows = conn.execute(
-            "SELECT * FROM tickets WHERE created >= ? ORDER BY created",
-            (since_date,),
-        ).fetchall()
-    else:
-        rows = conn.execute("SELECT * FROM tickets ORDER BY created").fetchall()
+    """Load tickets from the store, optionally filtered to a date range (inclusive)."""
+    query = "SELECT * FROM tickets"
+    params = []
+    
+    if start_date and end_date:
+        query += " WHERE created >= ? AND created <= ?"
+        params.extend([start_date, end_date])
+    elif start_date:
+        query += " WHERE created >= ?"
+        params.append(start_date)
+    elif end_date:
+        query += " WHERE created <= ?"
+        params.append(end_date)
+        
+    query += " ORDER BY created"
+    rows = conn.execute(query, params).fetchall()
 
     if not rows:
         return pd.DataFrame()
@@ -113,6 +122,27 @@ def ticket_count(conn: sqlite3.Connection) -> int:
     return conn.execute("SELECT COUNT(*) FROM tickets").fetchone()[0]
 
 
+def _format_date(date_str: Optional[str]) -> str:
+    if not date_str:
+        return "-"
+    try:
+        dt = date.fromisoformat(date_str[:10])
+        months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        return f"{months[dt.month - 1]} {dt.day}, {dt.year}"
+    except Exception:
+        return date_str[:10] if date_str else "-"
+
+
+def ticket_stats(conn: sqlite3.Connection) -> dict:
+    row = conn.execute("SELECT COUNT(*) as n, MIN(created) as min_dt, MAX(created) as max_dt FROM tickets").fetchone()
+    return {
+        "ticket_count": row["n"],
+        "min_date": _format_date(row["min_dt"]) if row["n"] > 0 else "-",
+        "max_date": _format_date(row["max_dt"]) if row["n"] > 0 else "-",
+    }
+
+
+
 def since_date_from_window(window_days: int) -> str:
     """Return ISO date string for N days ago."""
     return (date.today() - timedelta(days=window_days)).isoformat()
@@ -123,7 +153,8 @@ def since_date_from_window(window_days: int) -> str:
 def get_historical_context(
     account: str,
     issue_type: str,
-    since_date: str,
+    start_date: str,
+    end_date: str,
     conn: sqlite3.Connection,
 ) -> dict:
     """Query full ticket history to produce trend context for the LLM prompt.
@@ -132,8 +163,10 @@ def get_historical_context(
     period so the LLM knows whether this pattern is new, stable, or escalating.
     """
     # How many days is the detection window?
-    window_days = (date.today() - date.fromisoformat(since_date)).days or 1
-    prior_start = (date.fromisoformat(since_date) - timedelta(days=window_days)).isoformat()
+    d1 = date.fromisoformat(start_date[:10])
+    d2 = date.fromisoformat(end_date[:10])
+    window_days = max((d2 - d1).days, 1)
+    prior_start = (d1 - timedelta(days=window_days)).isoformat()
 
     # Scope: specific issue_type or whole account if "(multiple)"
     if issue_type and issue_type != "(multiple)":
@@ -151,14 +184,14 @@ def get_historical_context(
 
     recent = conn.execute(
         f"SELECT COUNT(*) FROM tickets "
-        f"WHERE account = ? {scope_clause} AND created >= ?",
-        (*base_params, since_date),
+        f"WHERE account = ? {scope_clause} AND created >= ? AND created <= ?",
+        (*base_params, start_date, end_date),
     ).fetchone()[0]
 
     prior = conn.execute(
         f"SELECT COUNT(*) FROM tickets "
         f"WHERE account = ? {scope_clause} AND created >= ? AND created < ?",
-        (*base_params, prior_start, since_date),
+        (*base_params, prior_start, start_date),
     ).fetchone()[0]
 
     if prior > 0:

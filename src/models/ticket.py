@@ -48,5 +48,4 @@ class Recommendation:
     recommendation_type: str    # automation | training | process_change | sales_opportunity
     recommended_action: str
     estimated_monthly_tickets_prevented: int
-    priority: str               # high | medium | low
     source_ticket_numbers: list = field(default_factory=list)

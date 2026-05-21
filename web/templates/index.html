@@ -1,0 +1,1042 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+  details > summary { list-style: none; }
+  details > summary::-webkit-details-marker { display: none; }
+  details[open] summary .dropdown-icon { transform: rotate(90deg); }
+
+  .markdown-body ul, .markdown-body ol { margin-left: 20px; margin-top: 6px; margin-bottom: 6px; }
+  .markdown-body li { margin-bottom: 8px; }
+  .markdown-body li:last-child { margin-bottom: 0; }
+  .markdown-body p { margin-bottom: 8px; }
+  .markdown-body p:last-child { margin-bottom: 0; }
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 32px;
+    align-items: start;
+    margin-top: 8px;
+  }
+
+  @media (max-width: 1024px) {
+    .dashboard-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  /* ── stats panel ── */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  
+  .stat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    padding: 18px 12px;
+    text-align: center;
+    box-shadow: var(--shadow-sm);
+    transition: all var(--transition-fast);
+  }
+
+
+  .stat-card .num {
+    font-family: var(--font-title);
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.2;
+    margin-bottom: 4px;
+  }
+
+  .stat-card .label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── upload zone ── */
+  .upload-zone {
+    border: 2px dashed var(--border-color);
+    border-radius: var(--border-radius-md);
+    padding: 24px 16px;
+    text-align: center;
+    background: rgba(0, 0, 0, 0.01);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    margin-bottom: 12px;
+    position: relative;
+  }
+
+  .upload-zone.dragover {
+    border-color: var(--accent-color);
+    background: rgba(26, 107, 181, 0.03);
+    box-shadow: inset 0 0 12px rgba(26, 107, 181, 0.03);
+  }
+
+  .upload-zone .icon {
+    font-size: 32px;
+    margin-bottom: 8px;
+    display: inline-block;
+  }
+
+  .upload-zone .title {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+  }
+
+  .upload-zone .subtitle {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  /* ── form fields ── */
+  .form-group {
+    margin-bottom: 16px;
+  }
+
+  .form-group label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+  }
+
+  .form-control {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    padding: 10px 12px;
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: 13.5px;
+    transition: all var(--transition-fast);
+  }
+
+  .form-control:focus {
+    background: #fff;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+    outline: none;
+  }
+
+  .checkbox-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .checkbox-group input[type="checkbox"] {
+    accent-color: var(--accent-color);
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
+  }
+
+  .checkbox-group label {
+    font-size: 13px;
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+
+  hr.divider {
+    border: 0;
+    height: 1px;
+    background: var(--border-color);
+    margin: 20px 0;
+  }
+
+  /* ── notifications ── */
+  .alert-toast {
+    position: fixed;
+    top: 24px;
+    right: 24px;
+    z-index: 1000;
+    padding: 14px 20px;
+    border-radius: var(--border-radius-md);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    display: none;
+    font-size: 13px;
+    font-weight: 500;
+    animation: slideIn 0.3s ease forwards;
+  }
+
+  .alert-toast.success {
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    color: #065f46;
+  }
+
+  .alert-toast.error {
+    background: #fef2f2;
+    border: 1px solid #fca5a5;
+    color: #991b1b;
+  }
+
+  @keyframes slideIn {
+    from { transform: translateX(120%); }
+    to { transform: translateX(0); }
+  }
+
+  /* ── workspace states ── */
+  .workspace-pane {
+    min-height: 500px;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 40px;
+    border: 1px dashed var(--border-color);
+    border-radius: var(--border-radius-lg);
+    background: rgba(0, 0, 0, 0.005);
+  }
+
+  .empty-state .icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    opacity: 0.6;
+  }
+
+  .empty-state h3 {
+    font-family: var(--font-title);
+    font-size: 18px;
+    margin-bottom: 8px;
+  }
+
+  .empty-state p {
+    color: var(--text-secondary);
+    max-width: 420px;
+    margin: 0 auto 20px;
+  }
+
+  /* ── progress panel & terminal ── */
+  .console-panel {
+    background: #0f172a;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    padding: 20px;
+    height: 380px;
+    overflow-y: auto;
+    font-family: 'Fira Code', 'Courier New', Courier, monospace;
+    font-size: 12px;
+    color: #38bdf8;
+    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.25);
+  }
+
+  .console-line {
+    margin-bottom: 4px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+  }
+
+  /* ── results header & controls ── */
+  .results-header {
+    background: rgba(0, 0, 0, 0.01);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    padding: 20px;
+    margin-bottom: 24px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .impact-summary {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .impact-title {
+    font-family: var(--font-title);
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .impact-subtitle {
+    font-size: 12.5px;
+    color: var(--accent-color);
+    font-weight: 500;
+  }
+
+  .filters-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    width: 100%;
+    margin-top: 10px;
+    border-top: 1px solid var(--border-color);
+    padding-top: 16px;
+  }
+
+  .search-wrapper {
+    position: relative;
+    flex: 1;
+    min-width: 260px;
+  }
+
+  .search-input {
+    width: 100%;
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    padding: 10px 16px;
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: 13px;
+    transition: all var(--transition-fast);
+  }
+
+  .search-input:focus {
+    background: #ffffff;
+    border-color: var(--accent-color);
+    outline: none;
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+
+  .filter-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .filter-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    font-weight: 700;
+    margin-right: 4px;
+  }
+
+  .pill {
+    padding: 6px 12px;
+    border-radius: 20px;
+    background: rgba(0, 0, 0, 0.03);
+    border: 1px solid var(--border-color);
+    font-family: var(--font-body);
+    font-size: 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-weight: 500;
+    transition: all var(--transition-fast);
+  }
+
+
+  .pill.active {
+    background: var(--accent-color);
+    color: #fff;
+    border-color: var(--accent-color);
+    box-shadow: 0 2px 8px var(--accent-glow);
+  }
+
+  /* ── recommendation cards ── */
+  .rec-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    padding: 24px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow-md);
+    transition: all var(--transition-fast);
+    position: relative;
+    overflow: hidden;
+  }
+
+
+
+  .rec-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+    gap: 16px;
+  }
+
+  .rec-card-title {
+    font-family: var(--font-title);
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .rec-card-subtitle {
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .rec-card-subtitle .dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--text-muted);
+  }
+
+  .rec-type-badge {
+    background: rgba(0, 0, 0, 0.03);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-family: var(--font-body);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+  }
+
+  .rec-stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 12px;
+    margin: 16px 0;
+  }
+  
+  .rec-stat-box {
+    background: #f8fafc;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    padding: 10px;
+    text-align: center;
+  }
+
+  .rec-stat-num {
+    font-family: var(--font-title);
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .rec-stat-label {
+    font-size: 10px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 2px;
+  }
+
+  .rec-details {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    margin-top: 20px;
+  }
+
+  .rec-section {
+    background: #f8fafc;
+    border-radius: var(--border-radius-md);
+    padding: 18px 20px;
+    border: 1px solid rgba(226, 232, 240, 0.9);
+    border-left: 4px solid #cbd5e1;
+  }
+
+  .rec-section.action {
+    background: rgba(26, 107, 181, 0.02);
+    border: 1px solid rgba(26, 107, 181, 0.12);
+    border-left: 4px solid var(--accent-color);
+  }
+
+  .rec-section-label {
+    font-family: var(--font-title);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
+    font-weight: 700;
+    margin-bottom: 10px;
+  }
+
+  .rec-section-content {
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--text-primary);
+  }
+
+  .rec-tickets-trigger {
+    font-family: var(--font-body);
+    font-size: 11px;
+    color: var(--accent-color);
+    cursor: pointer;
+    background: none;
+    border: none;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+  }
+
+
+  .rec-tickets-content {
+    margin-top: 8px;
+    padding: 10px 14px;
+    background: #f1f5f9;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    font-family: monospace;
+    font-size: 11px;
+    color: var(--text-secondary);
+    display: none;
+    word-break: break-all;
+  }
+
+  .rec-tickets-content.show {
+    display: block;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="alert-toast" id="toast-notify"></div>
+
+<header style="margin-bottom: 28px;">
+  <h1>Tickets Analysis AI</h1>
+  <p class="muted" style="font-size: 14px; margin-top: 4px;">Streamlined ticket analysis, pattern extraction, and AI-driven mitigation recommendations.</p>
+</header>
+
+<div class="dashboard-grid">
+  <!-- ── CONTROL CENTER (LEFT) ── -->
+  <div>
+    <!-- STATS -->
+    <div class="stats-grid" style="grid-template-columns: 1fr;">
+      <div class="stat-card" style="text-align: center;">
+        <div class="num" id="stat-tickets">{{ ticket_count }}</div>
+        <div class="label">Tickets</div>
+        <div class="muted" style="font-size: 11px; margin-top: 4px;" id="stat-date-range">Range: {{ min_date }} to {{ max_date }}</div>
+      </div>
+    </div>
+
+    <!-- TICKET IMPORT -->
+    <div class="card">
+      <h2 style="margin-top:0">1. Data Ingestion</h2>
+      <p class="muted" style="font-size:12px; margin-bottom:16px">
+        Drag & drop Autotask completed CSV files here to update the ticket warehouse. Duplicates are auto-skipped.
+      </p>
+
+      <form id="import-form">
+        <input type="file" id="file-input" name="files" multiple accept=".csv" class="hidden">
+        <div class="upload-zone" id="upload-zone">
+          <span class="icon"><i class="ph ph-upload-simple" style="color: var(--accent-color);"></i></span>
+          <div class="title" id="upload-title">Drop CSV files here</div>
+          <div class="subtitle" id="upload-subtitle">or click to browse</div>
+        </div>
+      </form>
+      
+      <div style="text-align:right">
+        <button class="btn btn-danger btn-sm" id="btn-clear-cache" style="padding:6px 12px; font-size:11px">
+          <i class="ph ph-trash" style="font-size: 11px; margin-right: 4px; vertical-align: -1px;"></i>Clear Recommendations Cache
+        </button>
+      </div>
+    </div>
+
+    <!-- RUN ANALYSIS -->
+    <div class="card">
+      <h2 style="margin-top:0">2. Engine Settings</h2>
+      <p class="muted" style="font-size:12px; margin-bottom:16px">
+        Configure variables to extract ticket pattern groupings and query the HatzAI analysis models.
+      </p>
+
+      <form id="analyze-form">
+        <div class="form-group">
+          <label>Window (Last N Days)</label>
+          <input type="number" id="window" name="window" min="1" max="365" placeholder="e.g. 30" class="form-control">
+          <div class="muted" style="font-size:11px; margin-top:4px">Standard NRC cycle is 30 days.</div>
+        </div>
+
+        <div class="form-group">
+          <label>Date Range (Inclusive)</label>
+          <div style="display: flex; gap: 8px;">
+            <input type="date" id="start_date" name="start_date" class="form-control">
+            <input type="date" id="end_date" name="end_date" class="form-control">
+          </div>
+          <div class="muted" style="font-size:11px; margin-top:4px">Alternative to window parameters.</div>
+        </div>
+
+        <div class="form-group">
+          <label>Top N Patterns Limit</label>
+          <input type="number" id="top" name="top" value="20" min="1" max="100" class="form-control">
+        </div>
+
+        <div class="checkbox-group">
+          <input type="checkbox" id="force_refresh" name="force_refresh">
+          <label for="force_refresh">Bypass Recommendation Cache</label>
+        </div>
+
+        <div class="checkbox-group">
+          <input type="checkbox" id="no_llm" name="no_llm">
+          <label for="no_llm">Stats Only (No AI API usage)</label>
+        </div>
+
+        <button class="btn btn-primary" type="submit" id="run-btn" style="width:100%; margin-top:10px">
+          <i class="ph ph-play" style="font-size: 13px; margin-right: 4px; vertical-align: -1px;"></i>Run Committee Analysis
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── WORKSPACE WORKPANE (RIGHT) ── -->
+  <div class="workspace-pane">
+    <!-- EMPTY STATE -->
+    <div class="empty-state" id="panel-idle">
+      <span class="icon"><i class="ph ph-chart-bar" style="font-size: 48px; opacity: 0.6; display: inline-block;"></i></span>
+      <h3>Engine Standby</h3>
+      <p>Configure settings on the left and click "Run Committee Analysis" to start pattern extraction and recommendation generation.</p>
+    </div>
+
+    <!-- PROGRESS WINDOW (RUNNING) -->
+    <div class="card" id="panel-running" style="display:none">
+      <h2 style="margin-top:0; display:flex; align-items:center; gap:12px">
+        <span class="spinner"></span>
+        Running Pattern Analysis...
+      </h2>
+      <p class="muted" style="font-size:12.5px; margin-bottom:16px">
+        Analyzing ticket relationships, computing trends, and requesting recommendations from HatzAI.
+      </p>
+      <div class="console-panel" id="console-output"></div>
+    </div>
+
+    <!-- ERROR PANEL -->
+    <div class="card" id="panel-error" style="display:none; border-color:var(--color-danger)">
+      <h2 style="margin-top:0; color:var(--color-danger)">Analysis Fault</h2>
+      <p id="error-text" style="margin-bottom:16px"></p>
+      <button class="btn btn-secondary" onclick="resetToIdle()">Dismiss</button>
+    </div>
+
+    <!-- RESULTS (DONE) -->
+    <div id="panel-results" style="display:none">
+      <!-- Summary Dashboard Header -->
+      <div class="results-header">
+        <div class="impact-summary">
+          <div class="impact-title" id="results-count">0 Recommendations</div>
+          <div class="impact-subtitle" id="results-prevented">~0 tickets/mo prevented if resolved</div>
+        </div>
+
+        <!-- Filters Row -->
+        <div class="filters-row">
+          <div class="search-wrapper">
+            <i class="ph ph-magnifying-glass search-icon" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 15px;"></i>
+            <input type="text" id="search-input" placeholder="Search by account, action, or summary..." class="search-input" style="padding-left: 38px;">
+          </div>
+          
+          <div class="filter-group">
+            <span class="filter-label">Type:</span>
+            <button class="pill active" data-type="all">All</button>
+            <button class="pill" data-type="automation">Automation</button>
+            <button class="pill" data-type="training">Training</button>
+            <button class="pill" data-type="process_change">Process</button>
+            <button class="pill" data-type="sales_opportunity">Sales</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recommendation Cards List -->
+      <div id="recommendations-container"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── Local In-Memory State ──
+  let allRecommendations = [];
+  let currentTypeFilter = 'all';
+  let activePollTimer = null;
+  let logOffsetPointer = 0;
+
+  // ── DOM References ──
+  const elIdle = document.getElementById('panel-idle');
+  const elRunning = document.getElementById('panel-running');
+  const elError = document.getElementById('panel-error');
+  const elResults = document.getElementById('panel-results');
+  const elConsole = document.getElementById('console-output');
+  const elErrorText = document.getElementById('error-text');
+  const elRecContainer = document.getElementById('recommendations-container');
+  const elSearch = document.getElementById('search-input');
+  
+  // Stats
+  const elStatTickets = document.getElementById('stat-tickets');
+  const elStatDateRange = document.getElementById('stat-date-range');
+  
+  // Date/Window Inputs
+  const elWindow = document.getElementById('window');
+  const elStartDate = document.getElementById('start_date');
+  const elEndDate = document.getElementById('end_date');
+
+  // Load existing recommendations if page loads on complete job
+  window.addEventListener('DOMContentLoaded', () => {
+    const initialJob = {{ job | tojson }};
+    if (initialJob.status === 'running') {
+      showRunningState();
+      startPolling();
+    } else if (initialJob.status === 'done' && initialJob.recommendations && initialJob.recommendations.length) {
+      allRecommendations = initialJob.recommendations;
+      showResultsState();
+      filterAndRender();
+    }
+  });
+
+  // Mutual Exclusivity: Window vs Date Range
+  elWindow.addEventListener('input', () => { 
+    if (elWindow.value) { elStartDate.value = ''; elEndDate.value = ''; }
+  });
+  elStartDate.addEventListener('input', () => { if (elStartDate.value) elWindow.value = ''; });
+  elEndDate.addEventListener('input', () => { if (elEndDate.value) elWindow.value = ''; });
+
+  // Toast Notifier Helper
+  function notify(text, type = 'success') {
+    const toast = document.getElementById('toast-notify');
+    toast.className = `alert-toast ${type}`;
+    toast.textContent = text;
+    toast.style.display = 'block';
+    setTimeout(() => { toast.style.display = 'none'; }, 4000);
+  }
+
+  function updateGlobalStats(ticketCount, minDate, maxDate) {
+    if (ticketCount !== undefined) elStatTickets.textContent = ticketCount;
+    if (minDate !== undefined && maxDate !== undefined) {
+      elStatDateRange.textContent = `Range: ${minDate} to ${maxDate}`;
+    }
+  }
+
+  // ── Drag & Drop CSV Uploader ──
+  const elUploadZone = document.getElementById('upload-zone');
+  const elFileInput = document.getElementById('file-input');
+
+  elUploadZone.addEventListener('click', () => elFileInput.click());
+  elUploadZone.addEventListener('dragover', (e) => { e.preventDefault(); elUploadZone.classList.add('dragover'); });
+  elUploadZone.addEventListener('dragleave', () => elUploadZone.classList.remove('dragover'));
+  elUploadZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    elUploadZone.classList.remove('dragover');
+    if (e.dataTransfer.files.length) {
+      handleFilesUpload(e.dataTransfer.files);
+    }
+  });
+  elFileInput.addEventListener('change', () => {
+    if (elFileInput.files.length) {
+      handleFilesUpload(elFileInput.files);
+    }
+  });
+
+  async function handleFilesUpload(filesList) {
+    const formData = new FormData();
+    for (let i = 0; i < filesList.length; i++) {
+      formData.append('files', filesList[i]);
+    }
+    
+    // UI Loading state
+    document.getElementById('upload-title').textContent = 'Uploading & Ingesting...';
+    document.getElementById('upload-subtitle').textContent = 'Please wait...';
+    
+    try {
+      const resp = await fetch('/import', { method: 'POST', body: formData });
+      const data = await resp.json();
+      if (resp.ok) {
+        notify(data.message, 'success');
+        updateGlobalStats(data.ticket_count, data.min_date, data.max_date);
+      } else {
+        notify(data.error || 'Ingestion failed.', 'error');
+        updateGlobalStats(data.ticket_count, data.min_date, data.max_date);
+      }
+    } catch (err) {
+      notify('Network error occurred during import.', 'error');
+    } finally {
+      document.getElementById('upload-title').textContent = 'Drop CSV files here';
+      document.getElementById('upload-subtitle').textContent = 'or click to browse';
+      elFileInput.value = '';
+    }
+  }
+
+  // ── Clear Cache ──
+  document.getElementById('btn-clear-cache').addEventListener('click', async () => {
+    if (!confirm('Are you sure you want to delete all cached recommendations? This forces subsequent queries to call HatzAI API again.')) return;
+    try {
+      const resp = await fetch('/cache-clear', { method: 'POST' });
+      const data = await resp.json();
+      if (resp.ok) {
+        notify(data.message, 'success');
+        updateGlobalStats(data.ticket_count, data.min_date, data.max_date);
+      } else {
+        notify('Failed to clear cache.', 'error');
+      }
+    } catch (e) {
+      notify('Network error clearing cache.', 'error');
+    }
+  });
+
+  // ── Run Analysis ──
+  document.getElementById('analyze-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    
+    showRunningState();
+    elConsole.textContent = 'Launching Engine...\n';
+    logOffsetPointer = 0;
+
+    try {
+      const resp = await fetch('/analyze/start', { method: 'POST', body: formData });
+      if (!resp.ok) {
+        const err = await resp.json();
+        showErrorState(err.error || 'Could not start analysis pipeline.');
+        return;
+      }
+      startPolling();
+    } catch (err) {
+      showErrorState('Network connection failure initiating analysis.');
+    }
+  });
+
+  // ── Workspace State switchers ──
+  function resetToIdle() {
+    elIdle.style.display = 'block';
+    elRunning.style.display = 'none';
+    elError.style.display = 'none';
+    elResults.style.display = 'none';
+  }
+
+  function showRunningState() {
+    elIdle.style.display = 'none';
+    elRunning.style.display = 'block';
+    elError.style.display = 'none';
+    elResults.style.display = 'none';
+  }
+
+  function showErrorState(msg) {
+    elIdle.style.display = 'none';
+    elRunning.style.display = 'none';
+    elError.style.display = 'block';
+    elResults.style.display = 'none';
+    elErrorText.textContent = msg;
+  }
+
+  function showResultsState() {
+    elIdle.style.display = 'none';
+    elRunning.style.display = 'none';
+    elError.style.display = 'none';
+    elResults.style.display = 'block';
+  }
+
+  // ── Polling Loop ──
+  function startPolling() {
+    if (activePollTimer) clearInterval(activePollTimer);
+    activePollTimer = setInterval(pollJobStatus, 1500);
+  }
+
+  async function pollJobStatus() {
+    try {
+      const resp = await fetch('/analyze/status');
+      if (!resp.ok) return;
+      const data = await resp.json();
+
+      // Print new logs
+      const newLines = data.log.slice(logOffsetPointer);
+      logOffsetPointer = data.log.length;
+      if (newLines.length) {
+        newLines.forEach(line => {
+          const div = document.createElement('div');
+          div.className = 'console-line';
+          div.textContent = line;
+          elConsole.appendChild(div);
+        });
+        elConsole.scrollTop = elConsole.scrollHeight;
+      }
+
+      if (data.status === 'done') {
+        clearInterval(activePollTimer);
+        allRecommendations = data.recommendations;
+        
+        // Refresh cache count stat asynchronously
+        fetch('/analyze/status').then(r => r.json()).then(d => {
+          // Just fetch a soft refresh of page variables
+          location.reload(); // soft reload can render serverside, or we just toggle client-side
+        }).catch(() => {});
+        
+        showResultsState();
+        filterAndRender();
+      } else if (data.status === 'error') {
+        clearInterval(activePollTimer);
+        showErrorState(data.error || 'Job failed in analysis runtime.');
+      }
+    } catch (e) {
+      console.error('Polling error: ', e);
+    }
+  }
+
+  // ── Search & Filter Logic ──
+  elSearch.addEventListener('input', () => filterAndRender());
+
+  // Recommendation Type Filter listeners
+  document.querySelectorAll('[data-type]').forEach(pill => {
+    pill.addEventListener('click', (e) => {
+      document.querySelectorAll('[data-type]').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      currentTypeFilter = pill.getAttribute('data-type');
+      filterAndRender();
+    });
+  });
+
+  const TYPE_LABELS = {
+    automation: 'Automation',
+    training: 'User Training',
+    process_change: 'Process Change',
+    sales_opportunity: 'Sales Opportunity'
+  };
+
+  function filterAndRender() {
+    const query = elSearch.value.trim().toLowerCase();
+    
+    const filtered = allRecommendations.filter(rec => {
+      // 1. Type match
+      if (currentTypeFilter !== 'all' && rec.recommendation_type !== currentTypeFilter) return false;
+
+      // 2. Search query match (Account, Summary, Action, Root cause)
+      if (query) {
+        const matchesAccount = rec.account.toLowerCase().includes(query);
+        const matchesSummary = rec.pattern_summary.toLowerCase().includes(query);
+        const matchesRoot = rec.root_cause.toLowerCase().includes(query);
+        const matchesAction = rec.recommended_action.toLowerCase().includes(query);
+        return matchesAccount || matchesSummary || matchesRoot || matchesAction;
+      }
+      
+      return true;
+    });
+
+    // Render Stats
+    const totalPrevented = filtered.reduce((acc, r) => acc + r.estimated_monthly_tickets_prevented, 0);
+    document.getElementById('results-count').textContent = `${filtered.length} Recommendation(s)`;
+    document.getElementById('results-prevented').textContent = `Preventing ~${totalPrevented} tickets/mo if resolved`;
+
+    // Render Cards
+    if (filtered.length === 0) {
+      elRecContainer.innerHTML = `
+        <div class="empty-state" style="padding: 40px; margin-top: 10px;">
+          <span class="icon"><i class="ph ph-magnifying-glass" style="font-size: 48px; opacity: 0.6; display: inline-block;"></i></span>
+          <h3>No matching results</h3>
+          <p>Try resetting the type filter or adjusting your search keyword.</p>
+        </div>
+      `;
+      return;
+    }
+
+    // Group by Account
+    const grouped = {};
+    filtered.forEach(rec => {
+      if (!grouped[rec.account]) grouped[rec.account] = [];
+      grouped[rec.account].push(rec);
+    });
+
+    elRecContainer.innerHTML = Object.keys(grouped).sort().map((account, accountIdx) => {
+      const recs = grouped[account];
+      
+      const cardsHtml = recs.map((rec, idx) => {
+        const typeLabel = TYPE_LABELS[rec.recommendation_type] || rec.recommendation_type.replace('_', ' ');
+        const patternLabel = rec.pattern_type.replace(/_/g, ' ').toUpperCase();
+        
+        return `
+          <div class="rec-card">
+            <div class="rec-card-header">
+              <div>
+                <div class="rec-card-title" style="font-size: 15px; letter-spacing: 0.03em; color: var(--text-secondary);">${patternLabel}</div>
+              </div>
+              <div class="rec-type-badge">${typeLabel}</div>
+            </div>
+
+            <div class="rec-stats-row">
+              <div class="rec-stat-box">
+                <div class="rec-stat-num">${rec.ticket_count}</div>
+                <div class="rec-stat-label">Pattern Tickets</div>
+              </div>
+              <div class="rec-stat-box">
+                <div class="rec-stat-num">${rec.unique_contacts}</div>
+                <div class="rec-stat-label">Staff Handled</div>
+              </div>
+              <div class="rec-stat-box">
+                <div class="rec-stat-num">~${rec.recurrence_rate}/wk</div>
+                <div class="rec-stat-label">Recurrence Rate</div>
+              </div>
+              <div class="rec-stat-box">
+                <div class="rec-stat-num">~${rec.estimated_monthly_tickets_prevented}</div>
+                <div class="rec-stat-label">Est. Monthly Savings</div>
+              </div>
+            </div>
+
+            <div class="rec-details">
+              <div class="rec-section">
+                <div class="rec-section-label">Observed Pattern</div>
+                <div class="rec-section-content markdown-body">${marked.parse(rec.pattern_summary)}</div>
+              </div>
+              
+              <div class="rec-section">
+                <div class="rec-section-label">Identified Root Cause</div>
+                <div class="rec-section-content markdown-body">${marked.parse(rec.root_cause)}</div>
+              </div>
+
+              <div class="rec-section action">
+                <div class="rec-section-label" style="color:var(--accent-color)">Recommended Action</div>
+                <div class="rec-section-content markdown-body" style="font-weight: 500;">${marked.parse(rec.recommended_action)}</div>
+              </div>
+            </div>
+
+            <div style="margin-top: 14px;">
+              <button class="rec-tickets-trigger" onclick="toggleTickets(this)">
+                <i class="ph ph-eye" style="margin-right: 4px; vertical-align: -1px;"></i>Show ticket references (${rec.source_ticket_numbers.length})
+              </button>
+              <div class="rec-tickets-content">
+                ${rec.source_ticket_numbers.join(', ')}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <details class="account-group" style="margin-bottom: 24px;" ${accountIdx === 0 ? 'open' : ''}>
+          <summary style="padding-bottom: 12px; border-bottom: 2px solid var(--border-color); color: var(--text-primary); display: flex; align-items: center; justify-content: space-between; cursor: pointer; list-style: none; font-size: 18px; font-weight: 600; font-family: var(--font-title); transition: opacity 0.2s;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <i class="ph ph-caret-right dropdown-icon" style="font-size: 12px; opacity: 0.5; display: inline-block; transition: transform 0.2s;"></i>
+              ${account}
+            </div>
+            <span class="badge badge-low" style="font-size: 11px; font-weight: 700; text-transform: uppercase;">${recs.length} Rec(s)</span>
+          </summary>
+          <div style="padding-top: 24px; padding-left: 12px; border-left: 2px dashed var(--border-color); margin-left: 6px; margin-top: 8px;">
+            ${cardsHtml}
+          </div>
+        </details>
+      `;
+    }).join('');
+  }
+
+  // Toggle Ticket references block
+  window.toggleTickets = function(button) {
+    const block = button.nextElementSibling;
+    block.classList.toggle('show');
+    if (block.classList.contains('show')) {
+      button.innerHTML = `<i class="ph ph-eye-slash" style="margin-right: 4px; vertical-align: -1px;"></i>Hide ticket references`;
+    } else {
+      const count = block.textContent.split(',').length;
+      button.innerHTML = `<i class="ph ph-eye" style="margin-right: 4px; vertical-align: -1px;"></i>Show ticket references (${count})`;
+    }
+  }
+</script>
+{% endblock %}

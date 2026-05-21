@@ -12,6 +12,9 @@ Commands:
   python main.py status                              Show store and cache stats
   python main.py models                              List available HatzAI models
   python main.py cache-clear                         Wipe cached recommendations
+  python main.py serve                               Start the web interface (default: 0.0.0.0:8000)
+  python main.py serve --host 127.0.0.1 --port 5000 Start on a specific host/port
+  python main.py serve --dev                         Enable auto-reload for development
 """
 
 import argparse
@@ -74,6 +77,17 @@ def cmd_status(_args) -> None:
     print(f"  Tickets in store         : {total}")
     print(f"  Cached recommendations   : {stats['cached_recommendations']}")
     print()
+
+
+def cmd_serve(args) -> None:
+    import uvicorn
+    print(f"Starting NRC AI web interface on http://{args.host}:{args.port}")
+    uvicorn.run(
+        "web.app:app",
+        host=args.host,
+        port=args.port,
+        reload=args.dev,
+    )
 
 
 def cmd_cache_clear(_args) -> None:
@@ -255,6 +269,12 @@ def main():
     imp = sub.add_parser("import", help="Import ticket CSVs into the store")
     imp.add_argument("csv_files", nargs="+", metavar="CSV_FILE")
 
+    # serve
+    srv = sub.add_parser("serve", help="Start the web interface")
+    srv.add_argument("--host", default="0.0.0.0", help="Bind host (default: 0.0.0.0)")
+    srv.add_argument("--port", type=int, default=8000, help="Bind port (default: 8000)")
+    srv.add_argument("--dev", action="store_true", help="Enable auto-reload (development mode)")
+
     # analyze
     ana = sub.add_parser("analyze", help="Analyze stored tickets and generate recommendations")
     ana.add_argument("csv_files", nargs="*", metavar="CSV_FILE",
@@ -286,6 +306,8 @@ def main():
         cmd_import(args)
     elif args.command == "analyze":
         cmd_analyze(args)
+    elif args.command == "serve":
+        cmd_serve(args)
     else:
         parser.print_help()
 
