@@ -155,6 +155,18 @@ def _rec_to_dict(rec) -> dict:
 async def get_logo():
     return FileResponse(str(Path(__file__).parent / "logo.png"))
 
+@app.get("/ping")
+async def ping_db():
+    """Keepalive endpoint to prevent Supabase Postgres from pausing."""
+    try:
+        conn = connect()
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1")
+        conn.close()
+        return JSONResponse({"status": "ok", "message": "Database pinged successfully"})
+    except Exception as e:
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
 @app.get("/")
 async def dashboard(request: Request, message: str = ""):
     conn = connect()
