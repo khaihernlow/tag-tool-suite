@@ -38,16 +38,19 @@ _job: dict = {
 }
 
 
+from typing import Any
+
 class _LogCapture:
     """Tee sys.stdout to both the terminal and the in-memory job log."""
 
-    def __init__(self) -> None:
-        self._original = sys.__stdout__
+    def __init__(self, original_stream: Any) -> None:
+        self._original = original_stream
         self._buf = ""
         self._lock = threading.Lock()
 
     def write(self, text: str) -> None:
-        self._original.write(text)
+        if hasattr(self._original, "write"):
+            self._original.write(text)
         self._buf += text
         if "\n" in self._buf:
             parts = self._buf.split("\n")
@@ -58,7 +61,8 @@ class _LogCapture:
                         _job["log"].append(line)
 
     def flush(self) -> None:
-        self._original.flush()
+        if hasattr(self._original, "flush"):
+            self._original.flush()
         if self._buf.strip():
             with self._lock:
                 _job["log"].append(self._buf)
@@ -67,8 +71,8 @@ class _LogCapture:
 
 def _run_analysis(options: dict) -> None:
     """Background thread: full analysis pipeline."""
-    capture = _LogCapture()
     original_stdout = sys.stdout
+    capture = _LogCapture(original_stdout)
     sys.stdout = capture
     conn = None
 
