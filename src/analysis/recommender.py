@@ -1,5 +1,5 @@
 import json
-import sqlite3
+import psycopg2
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Optional
@@ -141,7 +141,7 @@ def _result_to_recommendation(result: dict, pattern: Pattern) -> Recommendation:
 def generate_recommendations(
     patterns: List[Pattern],
     client: HatzAIClient,
-    conn: Optional[sqlite3.Connection] = None,
+    conn: Optional[psycopg2.extensions.connection] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     force_refresh: bool = False,
