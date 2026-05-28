@@ -3,6 +3,7 @@
 
 {% block extra_head %}
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <style>
   details > summary { list-style: none; }
   details > summary::-webkit-details-marker { display: none; }
@@ -628,9 +629,19 @@
     <div id="panel-results" style="display:none">
       <!-- Summary Dashboard Header -->
       <div class="results-header">
-        <div class="impact-summary">
-          <div class="impact-title" id="results-count">0 Recommendations</div>
-          <div class="impact-subtitle" id="results-prevented">~0 tickets/mo prevented if resolved</div>
+        <div style="display: flex; justify-content: space-between; width: 100%; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+          <div class="impact-summary">
+            <div class="impact-title" id="results-count">0 Recommendations</div>
+            <div class="impact-subtitle" id="results-prevented">~0 tickets/mo prevented if resolved</div>
+          </div>
+          <div class="export-actions" style="display: flex; gap: 8px;">
+            <a href="/analyze/export/csv" class="btn btn-secondary" style="font-size: 13px; padding: 6px 12px; text-decoration: none; color: inherit; display: flex; align-items: center; gap: 6px;">
+              <i class="ph ph-download-simple"></i> CSV
+            </a>
+            <button onclick="exportToPDF()" class="btn btn-secondary" style="font-size: 13px; padding: 6px 12px; display: flex; align-items: center; gap: 6px;">
+              <i class="ph ph-file-pdf"></i> PDF Report
+            </button>
+          </div>
         </div>
 
         <!-- Filters Row -->
@@ -1065,6 +1076,86 @@
       const count = block.textContent.split(',').length;
       button.innerHTML = `<i class="ph ph-eye" style="margin-right: 4px; vertical-align: -1px;"></i>Show ticket references (${count})`;
     }
+  }
+
+  // Escape HTML function for PDF generation
+  function escapeHTML(str) {
+    if (!str) return '';
+    return str.toString().replace(/[&<>'"]/g, 
+      tag => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      "'": '&#39;',
+      '"': '&quot;'
+    }[tag] || tag)
+    );
+  }
+
+  // Export to PDF using html2pdf
+  window.exportToPDF = function() {
+    const recs = currentJobData.recommendations || [];
+    if (recs.length === 0) {
+      showErrorState("No data to export.");
+      return;
+    }
+
+    // Create a temporary container
+    const container = document.createElement('div');
+    container.style.padding = '40px';
+    container.style.fontFamily = 'Inter, sans-serif';
+    container.style.color = '#1e293b';
+    container.style.backgroundColor = '#ffffff';
+
+    // Build Title
+    container.innerHTML = `
+      <div style="border-bottom: 2px solid #e2e8f0; margin-bottom: 24px; padding-bottom: 16px;">
+        <h1 style="margin: 0; font-size: 24px; color: #0f172a;">Noise Reduction Committee Report</h1>
+        <p style="margin: 8px 0 0 0; font-size: 14px; color: #64748b;">Generated automatically by NRC AI Engine</p>
+      </div>
+    `;
+
+    // Build Cards
+    recs.forEach(rec => {
+      const el = document.createElement('div');
+      el.style.marginBottom = '20px';
+      el.style.padding = '20px';
+      el.style.border = '1px solid #cbd5e1';
+      el.style.borderRadius = '8px';
+      el.style.pageBreakInside = 'avoid';
+
+      el.innerHTML = `
+        <h3 style="margin: 0 0 8px 0; font-size: 18px; color: #0f172a;">${escapeHTML(rec.account || 'Unknown Account')} - ${escapeHTML(rec.pattern_type || '')}</h3>
+        <div style="font-size: 12px; color: #64748b; margin-bottom: 12px;">
+          <strong>Impact:</strong> ${rec.ticket_count || 0} tickets identified (~${rec.estimated_monthly_tickets_prevented || 0}/mo prevented)
+        </div>
+        <p style="margin: 0 0 12px 0; font-size: 14px; line-height: 1.5;"><strong>Summary:</strong> ${marked.parse(rec.pattern_summary || '').replace(/<[^>]*>?/gm, '')}</p>
+        <p style="margin: 0 0 12px 0; font-size: 14px; line-height: 1.5;"><strong>Root Cause:</strong> ${marked.parse(rec.root_cause || '').replace(/<[^>]*>?/gm, '')}</p>
+        <div style="background-color: #f8fafc; border-left: 3px solid #3b82f6; padding: 12px; font-size: 14px; margin-top: 12px;">
+          <strong>Recommended Action:</strong><br>
+          ${marked.parse(rec.recommended_action || '').replace(/<[^>]*>?/gm, '')}
+        </div>
+      `;
+      container.appendChild(el);
+    });
+
+    // Hide the container off-screen
+    container.style.position = 'absolute';
+    container.style.left = '-9999px';
+    document.body.appendChild(container);
+
+    // html2pdf options
+    const opt = {
+      margin:       [0.5, 0.5, 0.5, 0.5],
+      filename:     'nrc-recommendations-report.pdf',
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true },
+      jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+    };
+
+    html2pdf().set(opt).from(container).save().then(() => {
+      document.body.removeChild(container);
+    });
   }
 </script>
 {% endblock %}

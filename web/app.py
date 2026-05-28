@@ -291,6 +291,48 @@ async def analysis_status():
     })
 
 
+@app.get("/analyze/export/csv")
+async def export_csv():
+    import csv
+    import io
+    from fastapi.responses import StreamingResponse
+
+    if not _job.get("recommendations"):
+        return JSONResponse({"error": "No recommendations available to export."}, status_code=400)
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Write header
+    writer.writerow([
+        "Account", "Pattern Type", "Ticket Count", "Recurrence Rate",
+        "Account Noise Ratio (%)", "Unique Contacts", "Estimated Monthly Prevented",
+        "Pattern Summary", "Root Cause", "Recommended Action", "Source Tickets"
+    ])
+    
+    # Write data
+    for rec in _job["recommendations"]:
+        writer.writerow([
+            rec.get("account", ""),
+            rec.get("pattern_type", ""),
+            rec.get("ticket_count", 0),
+            rec.get("recurrence_rate", 0),
+            rec.get("account_noise_ratio", 0),
+            rec.get("unique_contacts", 0),
+            rec.get("estimated_monthly_tickets_prevented", 0),
+            rec.get("pattern_summary", ""),
+            rec.get("root_cause", ""),
+            rec.get("recommended_action", ""),
+            ", ".join(rec.get("source_ticket_numbers", []))
+        ])
+    
+    output.seek(0)
+    
+    response = StreamingResponse(iter([output.getvalue()]), media_type="text/csv")
+    response.headers["Content-Disposition"] = "attachment; filename=nrc_recommendations.csv"
+    return response
+
+
 @app.post("/cache-clear")
 async def handle_cache_clear():
     conn = connect()
