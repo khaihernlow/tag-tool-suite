@@ -3,7 +3,6 @@
 
 {% block extra_head %}
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <style>
   details > summary { list-style: none; }
   details > summary::-webkit-details-marker { display: none; }
@@ -635,10 +634,10 @@
             <div class="impact-subtitle" id="results-prevented">~0 tickets/mo prevented if resolved</div>
           </div>
           <div class="export-actions" style="display: flex; gap: 8px;">
-            <a href="/analyze/export/csv" class="btn btn-secondary" style="font-size: 13px; padding: 6px 12px; text-decoration: none; color: inherit; display: flex; align-items: center; gap: 6px;">
+            <button onclick="exportToCSV(this)" class="btn btn-secondary" style="font-size: 13px; padding: 6px 12px; display: flex; align-items: center; gap: 6px;">
               <i class="ph ph-download-simple"></i> CSV
-            </a>
-            <button onclick="exportToPDF()" class="btn btn-secondary" style="font-size: 13px; padding: 6px 12px; display: flex; align-items: center; gap: 6px;">
+            </button>
+            <button onclick="exportToPDF(this)" id="btn-export-pdf" class="btn btn-secondary" style="font-size: 13px; padding: 6px 12px; display: flex; align-items: center; gap: 6px;">
               <i class="ph ph-file-pdf"></i> PDF Report
             </button>
           </div>
@@ -668,9 +667,15 @@
   </div>
 </div>
 
+<!-- Safe Data Injection for Javascript -->
+<script id="initial-job-data" type="application/json">
+  {{ job | tojson }}
+</script>
+
 <script>
   // ── Local In-Memory State ──
   let allRecommendations = [];
+  let filteredRecommendations = [];
   let currentTypeFilter = 'all';
   let activePollTimer = null;
   let logOffsetPointer = 0;
@@ -696,7 +701,8 @@
 
   // Load existing recommendations if page loads on complete job
   window.addEventListener('DOMContentLoaded', () => {
-    const initialJob = {{ job | tojson }};
+    const rawJobData = document.getElementById('initial-job-data').textContent;
+    const initialJob = JSON.parse(rawJobData);
     if (initialJob.status === 'running') {
       showRunningState();
       startPolling();
@@ -961,6 +967,8 @@
       return true;
     });
 
+    filteredRecommendations = filtered;
+
     // Render Stats
     const totalPrevented = filtered.reduce((acc, r) => acc + r.estimated_monthly_tickets_prevented, 0);
     document.getElementById('results-count').textContent = `${filtered.length} Recommendation(s)`;
@@ -1092,70 +1100,131 @@
     );
   }
 
-  // Export to PDF using html2pdf
-  window.exportToPDF = function() {
-    const recs = currentJobData.recommendations || [];
+  // Export to CSV
+  window.exportToCSV = function(btn) {
+    const recs = filteredRecommendations || [];
     if (recs.length === 0) {
       showErrorState("No data to export.");
       return;
     }
 
-    // Create a temporary container
-    const container = document.createElement('div');
-    container.style.padding = '40px';
-    container.style.fontFamily = 'Inter, sans-serif';
-    container.style.color = '#1e293b';
-    container.style.backgroundColor = '#ffffff';
+    const headers = [
+      "Account", "Pattern Type", "Ticket Count", "Recurrence Rate",
+      "Account Noise Ratio (%)", "Unique Contacts", "Estimated Monthly Prevented",
+      "Pattern Summary", "Root Cause", "Recommended Action", "Source Tickets"
+    ];
 
-    // Build Title
-    container.innerHTML = `
-      <div style="border-bottom: 2px solid #e2e8f0; margin-bottom: 24px; padding-bottom: 16px;">
-        <h1 style="margin: 0; font-size: 24px; color: #0f172a;">Noise Reduction Committee Report</h1>
-        <p style="margin: 8px 0 0 0; font-size: 14px; color: #64748b;">Generated automatically by NRC AI Engine</p>
+    const rows = recs.map(rec => [
+      `"${(rec.account || '').replace(/"/g, '""')}"`,
+      `"${(rec.pattern_type || '').replace(/"/g, '""')}"`,
+      rec.ticket_count || 0,
+      rec.recurrence_rate || 0,
+      rec.account_noise_ratio || 0,
+      rec.unique_contacts || 0,
+      rec.estimated_monthly_tickets_prevented || 0,
+      `"${(rec.pattern_summary || '').replace(/"/g, '""')}"`,
+      `"${(rec.root_cause || '').replace(/"/g, '""')}"`,
+      `"${(rec.recommended_action || '').replace(/"/g, '""')}"`,
+      `"${(rec.source_ticket_numbers || []).join(', ')}"`
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "nrc_recommendations.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Export to PDF using native print
+  window.exportToPDF = function(btn) {
+    const recs = filteredRecommendations || [];
+    if (recs.length === 0) {
+      showErrorState("No data to export.");
+      return;
+    }
+
+    const originalText = btn.innerHTML;
+    btn.innerHTML = `<i class="ph ph-spinner" style="animation: spin 1s linear infinite;"></i> Preparing...`;
+    btn.disabled = true;
+
+    // Use a hidden iframe to print without opening a new tab
+    let iframe = document.getElementById('pdf-print-frame');
+    if (!iframe) {
+      iframe = document.createElement('iframe');
+      iframe.id = 'pdf-print-frame';
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+    }
+
+    const htmlContent = recs.map(rec => `
+      <div class="rec-item">
+        <h3>${escapeHTML(rec.account || 'Unknown Account')} - ${escapeHTML(rec.pattern_type || '')}</h3>
+        <div class="impact">Impact: ${rec.ticket_count || 0} tickets identified (~${rec.estimated_monthly_tickets_prevented || 0}/mo prevented)</div>
+        
+        <div class="section-title">Summary</div>
+        <div class="content">${marked.parse(rec.pattern_summary || '')}</div>
+        
+        <div class="section-title">Root Cause</div>
+        <div class="content">${marked.parse(rec.root_cause || '')}</div>
+        
+        <div class="section-title" style="color: #0f172a;">Recommended Action</div>
+        <div class="content" style="font-weight: 500; color: #0f172a;">${marked.parse(rec.recommended_action || '')}</div>
       </div>
-    `;
+    `).join('');
 
-    // Build Cards
-    recs.forEach(rec => {
-      const el = document.createElement('div');
-      el.style.marginBottom = '20px';
-      el.style.padding = '20px';
-      el.style.border = '1px solid #cbd5e1';
-      el.style.borderRadius = '8px';
-      el.style.pageBreakInside = 'avoid';
-
-      el.innerHTML = `
-        <h3 style="margin: 0 0 8px 0; font-size: 18px; color: #0f172a;">${escapeHTML(rec.account || 'Unknown Account')} - ${escapeHTML(rec.pattern_type || '')}</h3>
-        <div style="font-size: 12px; color: #64748b; margin-bottom: 12px;">
-          <strong>Impact:</strong> ${rec.ticket_count || 0} tickets identified (~${rec.estimated_monthly_tickets_prevented || 0}/mo prevented)
+    iframe.contentDocument.open();
+    iframe.contentDocument.write(`
+      <html>
+      <head>
+        <title>NRC Recommendations Report</title>
+        <style>
+          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+          body { 
+            font-family: 'Inter', sans-serif; 
+            color: #1e293b; 
+            background-color: #ffffff;
+            margin: 0;
+            padding: 40px;
+          }
+          .rec-item { margin-bottom: 32px; page-break-inside: avoid; }
+          h3 { margin: 0 0 4px 0; font-size: 16px; color: #0f172a; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
+          .impact { font-size: 12px; color: #64748b; margin-bottom: 12px; font-weight: 500; }
+          .section-title { font-size: 11px; font-weight: 700; color: #64748b; margin: 16px 0 4px 0; text-transform: uppercase; letter-spacing: 0.5px; }
+          .content { font-size: 13px; line-height: 1.5; color: #334155; margin: 0; }
+          .content p { margin: 0 0 8px 0; }
+          .content ul, .content ol { margin: 0 0 12px 0; padding-left: 20px; }
+          .content li { margin-bottom: 4px; }
+          @media print {
+            body { padding: 0; }
+            @page { margin: 0.75in; }
+          }
+        </style>
+      </head>
+      <body>
+        <div style="border-bottom: 2px solid #0f172a; margin-bottom: 24px; padding-bottom: 12px;">
+          <h1 style="margin: 0; font-size: 22px; color: #0f172a;">Noise Reduction Committee Report</h1>
+          <p style="margin: 4px 0 0 0; font-size: 12px; color: #64748b;">Generated automatically by NRC AI Engine</p>
         </div>
-        <p style="margin: 0 0 12px 0; font-size: 14px; line-height: 1.5;"><strong>Summary:</strong> ${marked.parse(rec.pattern_summary || '').replace(/<[^>]*>?/gm, '')}</p>
-        <p style="margin: 0 0 12px 0; font-size: 14px; line-height: 1.5;"><strong>Root Cause:</strong> ${marked.parse(rec.root_cause || '').replace(/<[^>]*>?/gm, '')}</p>
-        <div style="background-color: #f8fafc; border-left: 3px solid #3b82f6; padding: 12px; font-size: 14px; margin-top: 12px;">
-          <strong>Recommended Action:</strong><br>
-          ${marked.parse(rec.recommended_action || '').replace(/<[^>]*>?/gm, '')}
-        </div>
-      `;
-      container.appendChild(el);
-    });
+        
+        ${htmlContent}
+      </body>
+      </html>
+    `);
+    iframe.contentDocument.close();
 
-    // Hide the container off-screen
-    container.style.position = 'absolute';
-    container.style.left = '-9999px';
-    document.body.appendChild(container);
-
-    // html2pdf options
-    const opt = {
-      margin:       [0.5, 0.5, 0.5, 0.5],
-      filename:     'nrc-recommendations-report.pdf',
-      image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { scale: 2, useCORS: true },
-      jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-    };
-
-    html2pdf().set(opt).from(container).save().then(() => {
-      document.body.removeChild(container);
-    });
+    // Trigger print from the parent window context to avoid any inline <script> tag escaping issues
+    setTimeout(() => {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+      
+      // Reset button
+      btn.innerHTML = originalText;
+      btn.disabled = false;
+    }, 500);
   }
 </script>
 {% endblock %}
