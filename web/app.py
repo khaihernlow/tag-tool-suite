@@ -8,11 +8,13 @@ from typing import Optional
 from urllib.parse import quote
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request, UploadFile, File
+from fastapi import FastAPI, Request, UploadFile, File, Depends, HTTPException
 from fastapi.responses import RedirectResponse, JSONResponse, FileResponse
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
+from authlib.integrations.starlette_client import OAuth, OAuthError
 
-load_dotenv()
+load_dotenv(override=True)
 
 from src.store.db import (
     connect, import_tickets, load_tickets,
@@ -24,7 +26,21 @@ from src.analysis.recommender import generate_recommendations
 from src.hatzai.client import HatzAIClient
 
 BASE_DIR = Path(__file__).parent
-app = FastAPI(title="NRC AI")
+app = FastAPI(title="TAG Solutions Tool Suite")
+
+# Session Middleware for SSO
+app.add_middleware(SessionMiddleware, secret_key=os.environ.get("SECRET_KEY", "dev_secret_key"))
+
+# OAuth Setup
+oauth = OAuth()
+oauth.register(
+    name='azure',
+    client_id=os.environ.get("AZURE_CLIENT_ID"),
+    client_secret=os.environ.get("AZURE_CLIENT_SECRET"),
+    server_metadata_url=f'https://login.microsoftonline.com/{os.environ.get("AZURE_TENANT_ID", "common")}/v2.0/.well-known/openid-configuration',
+    client_kwargs={'scope': 'openid email profile'}
+)
+
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 
@@ -167,20 +183,69 @@ async def ping_db():
     except Exception as e:
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
+def require_auth(request: Request):
+    user = request.session.get('user')
+    if not user:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return user
+
+# ── auth routes ───────────────────────────────────────────────────────────────
+
+@app.get("/auth/login")
+async def login(request: Request):
+    redirect_uri = request.url_for('auth_callback')
+    # Force HTTPS in production (Vercel)
+    if "tools.tagsolutions.com" in str(redirect_uri):
+        redirect_uri = str(redirect_uri).replace("http://", "https://")
+    return await oauth.azure.authorize_redirect(request, redirect_uri)
+
+@app.get("/auth/callback")
+async def auth_callback(request: Request):
+    try:
+        token = await oauth.azure.authorize_access_token(request)
+        user = token.get('userinfo')
+        if user:
+            request.session['user'] = user
+    except OAuthError as e:
+        print(f"OAuth Error: {e.error}")
+    return RedirectResponse(url='/')
+
+@app.get("/auth/logout")
+async def logout(request: Request):
+    request.session.pop('user', None)
+    return RedirectResponse(url='/')
+
+
+# ── tool suite routes ──────────────────────────────────────────────────────────
+
 @app.get("/")
+async def hub(request: Request):
+    user = request.session.get('user')
+    if not user:
+        return RedirectResponse('/auth/login')
+    return templates.TemplateResponse(request, "hub/index.html", {
+        "user": user,
+    })
+
+@app.get("/nrc")
 async def dashboard(request: Request, message: str = ""):
+    user = request.session.get('user')
+    if not user:
+        return RedirectResponse('/auth/login')
+        
     conn = connect()
     stats = ticket_stats(conn)
     conn.close()
-    return templates.TemplateResponse(request, "index.html", {
+    return templates.TemplateResponse(request, "nrc/index.html", {
         "message": message,
         "job": _job,
+        "user": user,
         **stats,
     })
 
 
 @app.post("/import")
-async def handle_import(files: list[UploadFile] = File(...)):
+async def handle_import(files: list[UploadFile] = File(...), user: dict = Depends(require_auth)):
     tmp_dir = Path(tempfile.mkdtemp())
     total_new = total_skipped = 0
     errors: list[str] = []
@@ -223,7 +288,7 @@ async def handle_import(files: list[UploadFile] = File(...)):
 
 
 @app.post("/analyze/start")
-async def start_analysis(request: Request):
+async def start_analysis(request: Request, user: dict = Depends(require_auth)):
     if _job["status"] == "running":
         return JSONResponse({"error": "An analysis is already running."}, status_code=409)
 
@@ -282,7 +347,7 @@ async def start_analysis(request: Request):
 
 
 @app.get("/analyze/status")
-async def analysis_status():
+async def analysis_status(user: dict = Depends(require_auth)):
     return JSONResponse({
         "status": _job["status"],
         "log": _job["log"],
@@ -292,7 +357,7 @@ async def analysis_status():
 
 
 @app.get("/analyze/export/csv")
-async def export_csv():
+async def export_csv(user: dict = Depends(require_auth)):
     import csv
     import io
     from fastapi.responses import StreamingResponse
@@ -334,7 +399,7 @@ async def export_csv():
 
 
 @app.post("/cache-clear")
-async def handle_cache_clear():
+async def handle_cache_clear(user: dict = Depends(require_auth)):
     conn = connect()
     deleted = cache_clear(conn)
     stats = ticket_stats(conn)

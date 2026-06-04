@@ -262,10 +262,20 @@
 
 <nav>
   <div class="brand-container">
-    <div class="logo-icon">N</div>
-    <span class="brand">Noise Reduction Committee</span>
+    <a href="/" style="text-decoration: none; display: flex; align-items: center; gap: 12px;">
+      <div class="logo-icon" style="background: linear-gradient(135deg, #1A6BB5, #4094e0);">T</div>
+      <span class="brand" style="color: #0f172a;">TAG Solutions Hub</span>
+    </a>
   </div>
-  <img src="/logo.png" alt="TAG Solutions Logo" style="height: 40px; width: auto; display: block;" />
+  <div style="display: flex; align-items: center; gap: 24px;">
+    {% if user %}
+      <div style="display: flex; align-items: center; gap: 12px; color: var(--text-secondary); font-weight: 500;">
+        <span>{{ user.name }}</span>
+        <a href="/auth/logout" class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px;">Logout</a>
+      </div>
+    {% endif %}
+    <img src="/logo.png" alt="TAG Solutions Logo" style="height: 40px; width: auto; display: block;" />
+  </div>
 </nav>
 
 <div class="container">

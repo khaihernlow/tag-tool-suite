@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}TAG Solutions Hub{% endblock %}
+
+{% block content %}
+<div style="display: flex; flex-direction: column; gap: 32px; max-width: 1000px; margin: 0 auto; padding-top: 40px;">
+  
+  <div style="text-align: center;">
+    <h1 style="font-size: 36px; margin-bottom: 12px;">Welcome to the TAG Hub</h1>
+    <p style="color: var(--text-secondary); font-size: 16px;">Your central dashboard for internal AI and automation tools.</p>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px; margin-top: 24px;">
+    
+    <!-- NRC AI Card -->
+    <a href="/nrc" style="text-decoration: none; color: inherit;">
+      <div class="card" style="height: 100%; display: flex; flex-direction: column; transition: all 0.2s ease; cursor: pointer; border: 1px solid var(--border-color);" onmouseover="this.style.borderColor='var(--accent-color)'; this.style.transform='translateY(-4px)'; this.style.boxShadow='var(--shadow-lg)'" onmouseout="this.style.borderColor='var(--border-color)'; this.style.transform='translateY(0)'; this.style.boxShadow='var(--shadow-md)'">
+        
+        <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
+          <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #1A6BB5, #4094e0); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: bold; box-shadow: 0 4px 12px rgba(26, 107, 181, 0.2);">
+            N
+          </div>
+          <div>
+            <h3 style="font-size: 18px; color: var(--text-primary); margin: 0;">NRC AI</h3>
+            <span class="badge badge-low" style="margin-top: 4px;">Active</span>
+          </div>
+        </div>
+
+        <p style="color: var(--text-secondary); font-size: 14px; flex-grow: 1;">
+          Noise Reduction Committee Analysis Engine. Cluster tickets, find patterns, and generate actionable insights using AI.
+        </p>
+
+        <div style="margin-top: 24px; color: var(--accent-color); font-weight: 600; font-size: 14px; display: flex; align-items: center; justify-content: flex-end;">
+          Open Tool &rarr;
+        </div>
+      </div>
+    </a>
+
+    <!-- Placeholder for Future Tool -->
+    <div class="card" style="height: 100%; display: flex; flex-direction: column; opacity: 0.6; border: 1px dashed var(--border-color); background: transparent; box-shadow: none;">
+      <div style="display: flex; align-items: center; justify-content: center; height: 100%; flex-direction: column; gap: 12px; color: var(--text-muted);">
+        <div style="width: 48px; height: 48px; background: rgba(0,0,0,0.05); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px;">
+          +
+        </div>
+        <div style="font-weight: 500;">Deploy new tool</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
