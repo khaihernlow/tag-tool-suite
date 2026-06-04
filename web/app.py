@@ -197,6 +197,10 @@ def require_auth(request: Request):
 
 @app.get("/auth/login")
 async def login(request: Request):
+    return templates.TemplateResponse(request, "auth/login.html", {})
+
+@app.get("/auth/login/microsoft")
+async def login_microsoft(request: Request):
     redirect_uri = request.url_for('auth_callback')
     # Force HTTPS in production (Vercel)
     if "tools.tagsolutions.com" in str(redirect_uri):

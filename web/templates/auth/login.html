@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — TAG Tool Suite</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@100..900&display=swap');
+
+    :root {
+      --font-body: 'Google Sans Flex', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --bg-primary: #f8fafc;
+      --text-primary: #0f172a;
+      --text-secondary: #475569;
+      --accent-color: #1A6BB5;
+      --border-color: rgba(226, 232, 240, 0.8);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font-body);
+      background-color: var(--bg-primary);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(26, 107, 181, 0.05) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.02) 0px, transparent 50%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .login-container {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 48px;
+      width: 100%;
+      max-width: 420px;
+      text-align: center;
+      box-shadow: 0 10px 15px -3px rgba(15, 23, 42, 0.06), 0 4px 6px -2px rgba(15, 23, 42, 0.02);
+    }
+
+    .logo {
+      height: 48px;
+      margin-bottom: 24px;
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+
+    p {
+      color: var(--text-secondary);
+      font-size: 14.5px;
+      line-height: 1.5;
+      margin-bottom: 32px;
+    }
+
+    .ms-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      width: 100%;
+      padding: 12px 24px;
+      background: white;
+      border: 1px solid #8c8c8c;
+      border-radius: 4px;
+      color: #5e5e5e;
+      font-family: 'Segoe UI', 'Google Sans Flex', sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      transition: background-color 0.2s, box-shadow 0.2s;
+    }
+
+    .ms-btn:hover {
+      background: #f3f3f3;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .ms-logo {
+      width: 21px;
+      height: 21px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="login-container">
+    <img src="/logo.png" alt="TAG Solutions" class="logo">
+    <h1>TAG Tool Suite</h1>
+    <p>Please sign in with your corporate Microsoft account to access internal tools.</p>
+
+    <a href="/auth/login/microsoft" class="ms-btn">
+      <svg class="ms-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 21 21">
+        <path fill="#f25022" d="M1 1h9v9H1z"/>
+        <path fill="#7fba00" d="M11 1h9v9h-9z"/>
+        <path fill="#00a4ef" d="M1 11h9v9H1z"/>
+        <path fill="#ffb900" d="M11 11h9v9h-9z"/>
+      </svg>
+      Sign in with Microsoft
+    </a>
+  </div>
+
+</body>
+</html>
