@@ -217,7 +217,16 @@ async def auth_callback(request: Request):
 @app.get("/auth/logout")
 async def logout(request: Request):
     request.session.pop('user', None)
-    return RedirectResponse(url='/')
+    
+    tenant_id = os.environ.get("AZURE_TENANT_ID", "common")
+    # Tell Microsoft to redirect back to our app after logging out
+    post_logout_uri = quote(str(request.base_url))
+    if "tools.tagsolutions.com" in post_logout_uri:
+        post_logout_uri = post_logout_uri.replace("http%3A", "https%3A")
+        
+    microsoft_logout_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/logout?post_logout_redirect_uri={post_logout_uri}"
+    
+    return RedirectResponse(url=microsoft_logout_url)
 
 
 # ── tool suite routes ──────────────────────────────────────────────────────────
