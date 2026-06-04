@@ -1,4 +1,7 @@
-# TAG Tool Suite
+<div align="center">
+  <img src="web/logo.png" alt="TAG Solutions Logo" width="300" />
+  <h1>TAG Tool Suite</h1>
+</div>
 
 A centralized portal for internal AI and automation tools built for **TAG Solutions** (Albany, NY). 
 
