@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}TAG Solutions Hub{% endblock %}
+{% block title %}TAG Tool Suite{% endblock %}
 
 {% block content %}
 <div style="display: flex; flex-direction: column; gap: 32px; max-width: 1000px; margin: 0 auto; padding-top: 40px;">
   
   <div style="text-align: center;">
-    <h1 style="font-size: 36px; margin-bottom: 12px;">Welcome to the TAG Hub</h1>
+    <h1 style="font-size: 36px; margin-bottom: 12px;">Welcome to the TAG Tool Suite</h1>
     <p style="color: var(--text-secondary); font-size: 16px;">Your central dashboard for internal AI and automation tools.</p>
   </div>
 
@@ -38,11 +38,12 @@
 
     <!-- Placeholder for Future Tool -->
     <div class="card" style="height: 100%; display: flex; flex-direction: column; opacity: 0.6; border: 1px dashed var(--border-color); background: transparent; box-shadow: none;">
-      <div style="display: flex; align-items: center; justify-content: center; height: 100%; flex-direction: column; gap: 12px; color: var(--text-muted);">
+      <div style="display: flex; align-items: center; justify-content: center; height: 100%; flex-direction: column; gap: 12px; color: var(--text-muted); text-align: center;">
         <div style="width: 48px; height: 48px; background: rgba(0,0,0,0.05); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px;">
-          +
+          <i class="ph ph-lightbulb"></i>
         </div>
-        <div style="font-weight: 500;">Deploy new tool</div>
+        <div style="font-weight: 600; color: var(--text-primary);">Need a custom tool?</div>
+        <div style="font-size: 13px; max-width: 250px;">Contact Khai (<a href="mailto:klow@tagsolutions.com" style="color: var(--accent-color); text-decoration: none; font-weight: 500;">klow@tagsolutions.com</a>) to request a new AI or automation workflow for your use case.</div>
       </div>
     </div>
 

@@ -26,7 +26,7 @@ from src.analysis.recommender import generate_recommendations
 from src.hatzai.client import HatzAIClient
 
 BASE_DIR = Path(__file__).parent
-app = FastAPI(title="TAG Solutions Tool Suite")
+app = FastAPI(title="TAG Tool Suite")
 
 # Session Middleware for SSO
 app.add_middleware(SessionMiddleware, secret_key=os.environ.get("SECRET_KEY", "dev_secret_key"))
@@ -170,6 +170,10 @@ def _rec_to_dict(rec) -> dict:
 @app.get("/logo.png")
 async def get_logo():
     return FileResponse(str(Path(__file__).parent / "logo.png"))
+
+@app.get("/favicon.png")
+async def get_favicon():
+    return FileResponse(str(Path(__file__).parent / "favicon.png"))
 
 @app.get("/ping")
 async def ping_db():
