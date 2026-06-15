@@ -253,34 +253,33 @@ async def dashboard(request: Request, message: str = ""):
 
 
 @app.post("/import")
-async def handle_import(files: list[UploadFile] = File(...), user: dict = Depends(require_auth)):
-    tmp_dir = Path(tempfile.mkdtemp())
+async def handle_import(request: Request, user: dict = Depends(require_auth)):
+    from src.ingest.csv_importer import clean_dataframe
+    import pandas as pd
+
     total_new = total_skipped = 0
     errors: list[str] = []
     stats = {"ticket_count": 0, "min_date": "-", "max_date": "-"}
 
     try:
-        conn = connect()
-        for upload in files:
-            tmp_path = tmp_dir / (upload.filename or "upload.csv")
-            with open(tmp_path, "wb") as f:
-                shutil.copyfileobj(upload.file, f)
-            try:
-                df = load_csv(str(tmp_path))
-                new, skipped = import_tickets(df, conn)
-                total_new += new
-                total_skipped += skipped
-            except Exception as exc:
-                errors.append(f"{upload.filename}: {exc}")
-        stats = ticket_stats(conn)
-        conn.close()
-    finally:
-        shutil.rmtree(tmp_dir, ignore_errors=True)
+        data = await request.json()
+        if not isinstance(data, list):
+            raise ValueError("Expected a JSON array of ticket objects")
 
-    if errors:
+        df = pd.DataFrame(data)
+        df = clean_dataframe(df)
+
+        conn = connect()
+        try:
+            total_new, total_skipped = import_tickets(df, conn)
+            stats = ticket_stats(conn)
+        finally:
+            conn.close()
+
+    except Exception as exc:
         return JSONResponse({
             "success": False,
-            "error": "; ".join(errors),
+            "error": str(exc),
             "ticket_count": stats["ticket_count"],
             "min_date": stats["min_date"],
             "max_date": stats["max_date"]

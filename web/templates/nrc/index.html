@@ -3,6 +3,7 @@
 
 {% block extra_head %}
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <style>
   details > summary { list-style: none; }
   details > summary::-webkit-details-marker { display: none; }
@@ -757,32 +758,86 @@
   });
 
   async function handleFilesUpload(filesList) {
-    const formData = new FormData();
-    for (let i = 0; i < filesList.length; i++) {
-      formData.append('files', filesList[i]);
-    }
+    if (filesList.length === 0) return;
     
     // UI Loading state
-    document.getElementById('upload-title').textContent = 'Uploading & Ingesting...';
+    document.getElementById('upload-title').textContent = 'Parsing CSV...';
     document.getElementById('upload-subtitle').textContent = 'Please wait...';
     
-    try {
-      const resp = await fetch('/import', { method: 'POST', body: formData });
-      const data = await resp.json();
-      if (resp.ok) {
-        notify(data.message, 'success');
-        updateGlobalStats(data.ticket_count, data.min_date, data.max_date);
-      } else {
-        notify(data.error || 'Ingestion failed.', 'error');
-        updateGlobalStats(data.ticket_count, data.min_date, data.max_date);
+    let totalNew = 0;
+    let totalSkipped = 0;
+    let hasError = false;
+
+    for (let i = 0; i < filesList.length; i++) {
+      const file = filesList[i];
+      document.getElementById('upload-subtitle').textContent = `Reading ${file.name}...`;
+
+      try {
+        await new Promise((resolve, reject) => {
+          Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            complete: async function(results) {
+              const data = results.data;
+              const chunkSize = 500;
+              const totalChunks = Math.ceil(data.length / chunkSize);
+
+              for (let chunkIdx = 0; chunkIdx < totalChunks; chunkIdx++) {
+                document.getElementById('upload-title').textContent = `Importing ${file.name}`;
+                document.getElementById('upload-subtitle').textContent = `Chunk ${chunkIdx + 1} of ${totalChunks}...`;
+
+                const chunk = data.slice(chunkIdx * chunkSize, (chunkIdx + 1) * chunkSize);
+                try {
+                  const resp = await fetch('/import', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(chunk)
+                  });
+                  const respData = await resp.json();
+                  
+                  if (!resp.ok) {
+                    notify(respData.error || 'Ingestion failed on a chunk.', 'error');
+                    updateGlobalStats(respData.ticket_count, respData.min_date, respData.max_date);
+                    hasError = true;
+                    reject(new Error("Chunk failed"));
+                    return;
+                  }
+                  
+                  // Extract numbers from "X new ticket(s) imported, Y duplicate(s) skipped."
+                  const match = respData.message.match(/(\d+) new.*?, (\d+) duplicate/);
+                  if (match) {
+                    totalNew += parseInt(match[1], 10);
+                    totalSkipped += parseInt(match[2], 10);
+                  }
+                  updateGlobalStats(respData.ticket_count, respData.min_date, respData.max_date);
+                } catch (err) {
+                  notify('Network error occurred during import.', 'error');
+                  hasError = true;
+                  reject(err);
+                  return;
+                }
+              }
+              resolve();
+            },
+            error: function(err) {
+              notify('Failed to parse CSV file.', 'error');
+              hasError = true;
+              reject(err);
+            }
+          });
+        });
+      } catch (err) {
+        break; // Stop processing further files if one fails entirely
       }
-    } catch (err) {
-      notify('Network error occurred during import.', 'error');
-    } finally {
-      document.getElementById('upload-title').textContent = 'Drop CSV files here';
-      document.getElementById('upload-subtitle').textContent = 'or click to browse';
-      elFileInput.value = '';
     }
+
+    if (!hasError) {
+      notify(`${totalNew} new ticket(s) imported, ${totalSkipped} duplicate(s) skipped.`, 'success');
+    }
+
+    document.getElementById('upload-title').textContent = 'Drop CSV files here';
+    document.getElementById('upload-subtitle').textContent = 'or click to browse';
+    elFileInput.value = '';
   }
 
   // ── Clear Cache ──
@@ -824,7 +879,7 @@
       if (data.status === 'done') {
         clearInterval(activePollTimer);
         allRecommendations = data.recommendations;
-        
+
         if (data.log) {
           elConsole.innerHTML = '';
           data.log.forEach(line => {
@@ -836,11 +891,6 @@
           elConsole.scrollTop = elConsole.scrollHeight;
         }
 
-        // Soft reload to refresh cache count
-        fetch('/analyze/status').then(r => r.json()).then(d => {
-          location.reload();
-        }).catch(() => {});
-        
         showResultsState();
         filterAndRender();
       } else if (data.status === 'error') {
@@ -910,13 +960,6 @@
       if (data.status === 'done') {
         clearInterval(activePollTimer);
         allRecommendations = data.recommendations;
-        
-        // Refresh cache count stat asynchronously
-        fetch('/analyze/status').then(r => r.json()).then(d => {
-          // Just fetch a soft refresh of page variables
-          location.reload(); // soft reload can render serverside, or we just toggle client-side
-        }).catch(() => {});
-        
         showResultsState();
         filterAndRender();
       } else if (data.status === 'error') {
