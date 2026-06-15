@@ -37,7 +37,6 @@ from src.store.db import (
 
 # ── display helpers ────────────────────────────────────────────────────────────
 
-PRIORITY_LABEL = {"high": "*** HIGH ***", "medium": "  MEDIUM   ", "low": "   low    "}
 REC_TYPE_LABEL = {
     "automation": "Automation",
     "training": "User Training",
@@ -145,7 +144,7 @@ def cmd_analyze(args) -> None:
                 print(f"  ERROR loading {path}: {e}")
 
     # ── load tickets (detection scope) ────────────────────────────────────────
-    df = load_tickets(conn, since_date=since_date)
+    df = load_tickets(conn, start_date=since_date)
     if df.empty:
         print("\nNo tickets in store. Run: python main.py import <csv_file>")
         conn.close()
@@ -207,7 +206,7 @@ def cmd_analyze(args) -> None:
 
     try:
         recommendations = generate_recommendations(
-            patterns, client, conn=conn, since_date=since_date, force_refresh=force
+            patterns, client, conn=conn, start_date=since_date, force_refresh=force
         )
     except HatzAIError as e:
         print(f"ERROR calling HatzAI: {e}")
@@ -223,11 +222,10 @@ def cmd_analyze(args) -> None:
     print_header(f"NRC RECOMMENDATIONS ({len(recommendations)} total)")
 
     for i, rec in enumerate(recommendations, 1):
-        priority_label = PRIORITY_LABEL.get(rec.priority, rec.priority).upper()
         type_label = REC_TYPE_LABEL.get(rec.recommendation_type, rec.recommendation_type)
 
         print(f"\n{'-'*78}")
-        print(f"  #{i}  [{priority_label}]  {type_label}")
+        print(f"  #{i}  {type_label}")
         print(f"  Account : {rec.pattern.account}")
         print(f"  Tickets : {', '.join(rec.source_ticket_numbers[:8])}"
               + (" ..." if len(rec.source_ticket_numbers) > 8 else ""))
